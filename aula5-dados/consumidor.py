@@ -355,7 +355,7 @@ def processar(msg, args, cfg, consumidor, container):
         return
 
     # Nome do blob: prefixo/partição-offset.json. A atividade (E1) pede para trocar o prefixo pelo sentimento.
-    nome_blob = f"{args.prefixo}/{msg.partition()}-{msg.offset()}.json"
+    nome_blob = f"{sentimento[:-1]+"o"}/{msg.partition()}-{msg.offset()}.json"
     resultado = {
         "id_produto": id_produto,
         "texto": texto,
