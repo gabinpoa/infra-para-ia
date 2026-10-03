@@ -8,54 +8,71 @@
 #             kubectl get deploy,rs,pods -o wide
 # Atualizar:  kubectl set image deployment/sentiment-api api=ghcr.io/rodolfo-s-antunes/sentiment-api:v3
 # Voltar:     kubectl rollout undo deployment/sentiment-api
-apiVersion: apps/v1               # Deployment vive no grupo apps, não no núcleo v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: sentiment-api
-spec:
-  replicas: 3                     # o número que o ReplicaSet persegue para sempre
 
-  selector:                       # como o Deployment reconhece os pods que são dele;
-    matchLabels:                  # precisa bater com template.metadata.labels
+spec:
+  replicas: 4
+
+  selector:
+    matchLabels:
       app: sentiment-api
 
   strategy:
-    type: RollingUpdate           # troca pod a pod (a alternativa, Recreate, derruba tudo)
+    type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1                 # pode existir 1 pod a mais que o desejado durante a troca
-      maxUnavailable: 0           # e nunca 1 a menos: capacidade total o tempo todo
+      maxSurge: 1
+      maxUnavailable: 0
 
-  template:                       # daqui para baixo é o pod.yaml da Aula 2, embutido
+  template:
     metadata:
       labels:
-        app: sentiment-api        # todo pod nasce com esta label: é o que o Service procura
+        app: sentiment-api
+        dupla: gab
+        turma: 2026-2
+
     spec:
       containers:
-        - name: api               # o nome usado no kubectl set image ... api=...
-          image: ghcr.io/rodolfo-s-antunes/sentiment-api:v2
+        - name: api
+          image: ghcr.io/rodolfo-s-antunes/sentiment-api:v3
+
           ports:
             - containerPort: 8000
 
           resources:
-            requests:             # o que o scheduler reserva para decidir se o pod cabe no nó
-              cpu: 100m           # um décimo de núcleo: 3 réplicas cabem folgadas no D2as_v7
+            requests:
+              cpu: 100m
               memory: 128Mi
-            limits:               # o teto que o container não pode ultrapassar (cgroups)
+            limits:
               cpu: 500m
               memory: 512Mi
 
-          readinessProbe:         # "já pode receber tráfego?"
+          readinessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 5    # carência para o modelo carregar
-            periodSeconds: 5          # pergunta a cada 5 s
-            failureThreshold: 3       # 3 falhas seguidas: sai dos endpoints do Service
 
-          livenessProbe:          # "ainda está vivo?"
+            # A API inicia rapidamente, então 3 s bastam antes do primeiro teste.
+            initialDelaySeconds: 3
+
+            # Verificações a cada 4 s detectam prontidão rapidamente.
+            periodSeconds: 4
+
+            # Duas falhas evitam manter um pod indisponível por muito tempo.
+            failureThreshold: 2
+
+          livenessProbe:
             httpGet:
               path: /health
               port: 8000
-            initialDelaySeconds: 15   # mais tolerante que a readiness, de propósito
-            periodSeconds: 10
-            failureThreshold: 3       # 3 falhas seguidas: o container é reiniciado
+
+            # A liveness espera mais que a readiness para não reiniciar durante a inicialização.
+            initialDelaySeconds: 10
+
+            # Um intervalo de 7 s evita verificações excessivas após a inicialização.
+            periodSeconds: 7
+
+            # Quatro falhas dão margem para problemas temporários antes do restart.
+            failureThreshold: 4
